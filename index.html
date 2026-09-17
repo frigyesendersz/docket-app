@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="A to-do list with optional due dates and a calendar view for deadlines.">
+  <title>Docket</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  html,body{margin:0;}
+  [hidden]{display:none!important;}
+  img{max-width:100%;}
+
+  :root{
+    --bg:#F5F3EE;
+    --surface:#FFFFFF;
+    --surface-2:#ECE8DE;
+    --text:#20241F;
+    --text-muted:#6E7268;
+    --accent:#2F6F5E;
+    --accent-strong:#1F5346;
+    --accent-soft:#DCEDE6;
+    --danger:#B14A34;
+    --danger-soft:#F3E1DA;
+    --border:#DFDACD;
+    --shadow: 0 1px 2px rgba(32,36,31,0.06), 0 8px 24px -12px rgba(32,36,31,0.18);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14181A;
+      --surface:#1C211D;
+      --surface-2:#242A24;
+      --text:#E9EBE4;
+      --text-muted:#9BA196;
+      --accent:#63C2A2;
+      --accent-strong:#8AD8BB;
+      --accent-soft:rgba(99,194,162,0.16);
+      --danger:#E4906F;
+      --danger-soft:rgba(228,144,111,0.14);
+      --border:#2B312B;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#14181A;
+    --surface:#1C211D;
+    --surface-2:#242A24;
+    --text:#E9EBE4;
+    --text-muted:#9BA196;
+    --accent:#63C2A2;
+    --accent-strong:#8AD8BB;
+    --accent-soft:rgba(99,194,162,0.16);
+    --danger:#E4906F;
+    --danger-soft:rgba(228,144,111,0.14);
+    --border:#2B312B;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+  *{box-sizing:border-box;}
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none!important; animation:none!important;}
+  }
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Karla',-apple-system,BlinkMacSystemFont,sans-serif;
+    font-size:15px;
+    line-height:1.5;
+    padding-inline:16px;
+    padding-block:0 32px;
+  }
+  h1,h2,h3{font-family:'Sora',-apple-system,sans-serif; margin:0;}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace;}
+  a{color:inherit;}
+  button{font:inherit; cursor:pointer;}
+  input{font:inherit;}
+  .wrap{max-width:640px; margin:0 auto;}
+
+  header.app{
+    position:sticky;
+    top:env(safe-area-inset-top,0px);
+    background:var(--bg);
+    z-index:10;
+    padding-block:18px 12px;
+    display:flex; flex-direction:column; gap:14px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px;
+  }
+  .brand .mark{
+    width:30px;height:30px;border-radius:8px;
+    background:var(--accent);
+    display:flex;align-items:center;justify-content:center;
+    color:var(--surface); font-family:'Sora'; font-weight:700; font-size:15px;
+    flex-shrink:0;
+  }
+  .brand h1{font-size:19px; font-weight:700; letter-spacing:-0.01em;}
+  .brand .sub{font-size:12.5px; color:var(--text-muted);}
+
+  .tabs{
+    display:flex; gap:4px;
+    background:var(--surface-2);
+    padding:4px; border-radius:12px;
+  }
+  .tabs button{
+    flex:1; border:none; background:transparent; color:var(--text-muted);
+    padding:9px 10px; border-radius:9px; font-weight:600; font-size:13.5px;
+    transition:background 150ms, color 150ms;
+  }
+  .tabs button[aria-selected="true"]{
+    background:var(--surface); color:var(--text);
+    box-shadow:var(--shadow);
+  }
+
+  section[hidden]{display:none!important;}
+
+  /* Add bar */
+  .add-bar{
+    display:flex; gap:8px; margin-bottom:18px;
+  }
+  .add-bar input[type="text"]{
+    flex:1; min-width:0;
+    padding:11px 13px; border-radius:10px;
+    border:1px solid var(--border); background:var(--surface); color:var(--text);
+  }
+  .add-bar input[type="date"]{
+    padding:11px 10px; border-radius:10px;
+    border:1px solid var(--border); background:var(--surface); color:var(--text);
+    width:132px; font-size:13px;
+  }
+  .add-bar input:focus-visible, button:focus-visible, .day:focus-visible{
+    outline:2px solid var(--accent); outline-offset:1px;
+  }
+  .btn-add{
+    background:var(--accent); color:var(--surface); border:none;
+    border-radius:10px; padding:0 16px; font-weight:700; font-size:14px;
+    flex-shrink:0;
+  }
+  .btn-add:hover{background:var(--accent-strong);}
+  @media (max-width:480px){
+    .add-bar{flex-wrap:wrap;}
+    .add-bar input[type="text"]{flex-basis:100%;}
+    .add-bar input[type="date"]{flex:1;}
+  }
+
+  /* Sort control */
+  .sort-row{display:flex; align-items:center; gap:10px; margin-bottom:16px;}
+  .sort-label{
+    font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em;
+    color:var(--text-muted);
+  }
+  .sort-toggle{display:flex; gap:4px; background:var(--surface-2); padding:3px; border-radius:9px;}
+  .sort-btn{
+    border:none; background:transparent; color:var(--text-muted);
+    padding:6px 11px; border-radius:7px; font-size:12.5px; font-weight:600;
+    transition:background 150ms, color 150ms;
+  }
+  .sort-btn[aria-pressed="true"]{background:var(--surface); color:var(--text); box-shadow:var(--shadow);}
+
+  /* Task groups */
+  .group{margin-bottom:20px;}
+  .group-title{
+    font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em;
+    color:var(--text-muted); margin-bottom:8px; display:flex; align-items:center; gap:7px;
+  }
+  .group-title.overdue{color:var(--danger);}
+  .group-title .count{
+    font-family:'IBM Plex Mono'; font-weight:600; opacity:0.7;
+  }
+  .rows{
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    overflow:hidden;
+  }
+  .row{
+    display:flex; align-items:center; gap:11px;
+    padding:11px 13px;
+    border-bottom:1px solid var(--border);
+  }
+  .row:last-child{border-bottom:none;}
+  .check{
+    width:20px;height:20px;border-radius:50%;
+    border:2px solid var(--border); background:var(--surface);
+    flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    transition:background 120ms, border-color 120ms;
+  }
+  .check.done{background:var(--accent); border-color:var(--accent);}
+  .check.done::after{
+    content:""; width:5px; height:9px;
+    border-right:2px solid var(--surface); border-bottom:2px solid var(--surface);
+    transform:rotate(45deg) translate(-1px,-1px);
+  }
+  .row-title{flex:1; min-width:0; overflow-wrap:break-word;}
+  .row-title.done{color:var(--text-muted); text-decoration:line-through;}
+  .proj-tag{
+    display:inline-block; font-family:'IBM Plex Mono'; font-size:10.5px; font-weight:600;
+    background:var(--accent-soft); color:var(--accent-strong); padding:2px 6px; border-radius:5px;
+    margin-right:7px; vertical-align:middle;
+  }
+  .chip{
+    font-family:'IBM Plex Mono'; font-size:11.5px; font-weight:600;
+    padding:3px 8px; border-radius:7px; background:var(--surface-2); color:var(--text-muted);
+    flex-shrink:0; white-space:nowrap; border:none;
+  }
+  .chip.today{background:var(--accent-soft); color:var(--accent-strong);}
+  .chip.overdue{background:var(--danger-soft); color:var(--danger);}
+  .chip-edit{
+    font-family:'IBM Plex Mono'; font-size:11.5px;
+    border:1px solid var(--border); border-radius:7px; padding:2px 5px;
+    background:var(--surface); color:var(--text); width:118px;
+  }
+  .row-del{
+    border:none; background:transparent; color:var(--text-muted);
+    width:22px; height:22px; border-radius:6px; flex-shrink:0;
+    font-size:16px; line-height:1; display:flex; align-items:center; justify-content:center;
+  }
+  .row-del:hover{background:var(--danger-soft); color:var(--danger);}
+
+  .empty{
+    color:var(--text-muted); font-size:13.5px; text-align:center;
+    padding:26px 16px; border:1px dashed var(--border); border-radius:12px;
+  }
+
+  .completed-toggle{
+    width:100%; text-align:left; background:transparent; border:none;
+    color:var(--text-muted); font-weight:600; font-size:12.5px;
+    padding:9px 2px; display:flex; align-items:center; gap:6px;
+  }
+  .completed-toggle .arrow{transition:transform 150ms;}
+  .completed-toggle.open .arrow{transform:rotate(90deg);}
+
+  /* Calendar */
+  .cal-header{
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;
+  }
+  .cal-header h2{font-size:17px; font-weight:700;}
+  .cal-nav{display:flex; gap:6px; align-items:center;}
+  .cal-nav button{
+    width:30px;height:30px; border-radius:8px; border:1px solid var(--border);
+    background:var(--surface); color:var(--text); display:flex; align-items:center; justify-content:center;
+  }
+  .cal-nav button:hover{background:var(--surface-2);}
+  .cal-today-btn{
+    border:1px solid var(--border); background:var(--surface); color:var(--text);
+    border-radius:8px; padding:6px 10px; font-size:12.5px; font-weight:600;
+  }
+  .weekdays{
+    display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-bottom:5px;
+  }
+  .weekdays div{
+    text-align:center; font-family:'IBM Plex Mono'; font-size:10.5px; font-weight:600;
+    color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em;
+  }
+  .grid{
+    display:grid; grid-template-columns:repeat(7,1fr); gap:5px;
+  }
+  .day{
+    aspect-ratio:1/1; min-height:44px;
+    border-radius:9px; border:1px solid var(--border); background:var(--surface);
+    padding:5px 5px; display:flex; flex-direction:column; gap:2px;
+    text-align:left; overflow:hidden; position:relative;
+  }
+  .day:hover{background:var(--surface-2);}
+  .day.out{opacity:0.38;}
+  .day .num{
+    font-family:'IBM Plex Mono'; font-size:11.5px; font-weight:600; color:var(--text-muted);
+  }
+  .day.today .num{
+    color:var(--surface); background:var(--accent); border-radius:5px; width:18px; height:18px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .day.selected{border-color:var(--accent); box-shadow:0 0 0 1.5px var(--accent);}
+  .day .dots{display:flex; gap:2px; flex-wrap:wrap; margin-top:auto;}
+  .day .dot{width:5px; height:5px; border-radius:50%; background:var(--accent);}
+  .day .dot.done{background:var(--text-muted); opacity:0.5;}
+  .day .dot.overdue{background:var(--danger);}
+  .day .dot.project{border-radius:2px; transform:rotate(45deg);}
+  @media (max-width:480px){
+    .day{min-height:38px; padding:4px;}
+    .day .num{font-size:10.5px;}
+  }
+
+  .day-panel{
+    margin-top:16px; background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:14px;
+  }
+  .day-panel h3{font-size:14px; margin-bottom:10px;}
+  .day-panel .add-bar{margin-bottom:12px;}
+  .day-panel .add-bar input[type="text"]{flex:1;}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="app">
+    <div class="brand">
+      <div class="mark">D</div>
+      <div>
+        <h1>Docket</h1>
+        <div class="sub">Tasks &amp; deadlines, kept in sync</div>
+      </div>
+    </div>
+    <div class="tabs" role="tablist">
+      <button id="tabTasks" role="tab" aria-selected="true">Tasks</button>
+      <button id="tabCal" role="tab" aria-selected="false">Calendar</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="tasksView">
+      <form class="add-bar" id="addForm">
+        <input type="text" id="newTitle" placeholder="Add a task…" autocomplete="off" required>
+        <input type="date" id="newDate">
+        <button type="submit" class="btn-add">Add</button>
+      </form>
+      <div class="sort-row">
+        <span class="sort-label">Sort</span>
+        <div class="sort-toggle" role="group" aria-label="Sort tasks">
+          <button type="button" id="sortDeadline" class="sort-btn" aria-pressed="true">By deadline</button>
+          <button type="button" id="sortAdded" class="sort-btn" aria-pressed="false">Recently added</button>
+        </div>
+      </div>
+      <div id="taskGroups"></div>
+    </section>
+
+    <section id="calendarView" hidden>
+      <div class="cal-header">
+        <h2 id="calLabel"></h2>
+        <div class="cal-nav">
+          <button id="calPrev" aria-label="Previous month">‹</button>
+          <button class="cal-today-btn" id="calToday">Today</button>
+          <button id="calNext" aria-label="Next month">›</button>
+        </div>
+      </div>
+      <div class="weekdays">
+        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+      </div>
+      <div class="grid" id="calGrid"></div>
+      <div class="day-panel" id="dayPanel" hidden>
+        <h3 id="dayPanelLabel"></h3>
+        <form class="add-bar" id="dayAddForm">
+          <input type="text" id="dayNewTitle" placeholder="Deadline title…" autocomplete="off" required>
+          <input type="text" id="dayNewProject" placeholder="Project (optional)" autocomplete="off">
+          <button type="submit" class="btn-add">Add</button>
+        </form>
+        <div class="rows" id="dayRows"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  function pad(n){ return String(n).padStart(2,"0"); }
+  function toDateStr(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+  function todayStr(){ return toDateStr(new Date()); }
+  function parseLocalDate(s){
+    var parts = s.split("-");
+    return new Date(Number(parts[0]), Number(parts[1])-1, Number(parts[2]));
+  }
+  function fmtChip(s){
+    var d = parseLocalDate(s);
+    var t = todayStr();
+    if(s === t) return "Today";
+    var opts = { month:"short", day:"numeric" };
+    if(d.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
+    return d.toLocaleDateString(undefined, opts);
+  }
+  function uid(){ return "t" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+  // ---------- Store: db capability with localStorage fallback ----------
+  var tasks = new Map(); // id -> {id,title,done,dueDate,createdAt}
+  var storeReady = false;
+  var dbCol = null;
+  var LS_KEY = "docket-tasks-v1";
+
+  function renderAll(){
+    renderTasksView();
+    renderCalendar();
+  }
+
+  function loadLocal(){
+    try{
+      var raw = localStorage.getItem(LS_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      tasks.clear();
+      arr.forEach(function(t){ tasks.set(t.id, t); });
+    }catch(e){ tasks.clear(); }
+  }
+  function saveLocal(){
+    try{
+      localStorage.setItem(LS_KEY, JSON.stringify(Array.from(tasks.values())));
+    }catch(e){}
+  }
+
+  var store = {
+    add: function(data){
+      if(dbCol){
+        return dbCol.add(data).catch(function(){});
+      }
+      var t = Object.assign({id:uid()}, data);
+      tasks.set(t.id, t);
+      saveLocal(); renderAll();
+      return Promise.resolve();
+    },
+    update: function(id, patch){
+      if(dbCol){
+        return dbCol.doc(id).update(patch).catch(function(){});
+      }
+      var t = tasks.get(id);
+      if(t){ Object.assign(t, patch); saveLocal(); renderAll(); }
+      return Promise.resolve();
+    },
+    remove: function(id){
+      if(dbCol){
+        return dbCol.doc(id).delete().catch(function(){});
+      }
+      tasks.delete(id); saveLocal(); renderAll();
+      return Promise.resolve();
+    }
+  };
+
+  function initStore(){
+    if(window.claude && window.claude.use){
+      window.claude.use("db").then(function(db){
+        if(!db){ loadLocal(); storeReady = true; renderAll(); return; }
+        dbCol = db.collection("tasks");
+        dbCol.onSnapshot(function(snap){
+          tasks.clear();
+          snap.docs.forEach(function(d){
+            var data = d.data() || {};
+            tasks.set(d.id, {
+              id:d.id,
+              title: data.title || "",
+              done: !!data.done,
+              dueDate: data.dueDate || null,
+              project: data.project || null,
+              createdAt: data.createdAt || 0
+            });
+          });
+          storeReady = true;
+          renderAll();
+        }, function(){
+          loadLocal(); storeReady = true; renderAll();
+        });
+      }).catch(function(){
+        loadLocal(); storeReady = true; renderAll();
+      });
+    } else {
+      loadLocal(); storeReady = true; renderAll();
+    }
+  }
+
+  // ---------- Tasks view ----------
+  var taskGroupsEl = document.getElementById("taskGroups");
+  var completedOpen = false;
+  var sortMode = "deadline"; // "deadline" | "added"
+  var sortDeadlineBtn = document.getElementById("sortDeadline");
+  var sortAddedBtn = document.getElementById("sortAdded");
+
+  function setSortMode(mode){
+    sortMode = mode;
+    sortDeadlineBtn.setAttribute("aria-pressed", String(mode === "deadline"));
+    sortAddedBtn.setAttribute("aria-pressed", String(mode === "added"));
+    renderTasksView();
+  }
+  sortDeadlineBtn.addEventListener("click", function(){ setSortMode("deadline"); });
+  sortAddedBtn.addEventListener("click", function(){ setSortMode("added"); });
+
+  function rowEl(t){
+    var row = document.createElement("div");
+    row.className = "row";
+
+    var check = document.createElement("button");
+    check.className = "check" + (t.done ? " done" : "");
+    check.setAttribute("aria-label", t.done ? "Mark not done" : "Mark done");
+    check.addEventListener("click", function(){ store.update(t.id, {done:!t.done}); });
+    row.appendChild(check);
+
+    var title = document.createElement("div");
+    title.className = "row-title" + (t.done ? " done" : "");
+    if(t.project){
+      var tag = document.createElement("span");
+      tag.className = "proj-tag";
+      tag.textContent = t.project;
+      title.appendChild(tag);
+    }
+    title.appendChild(document.createTextNode(t.title));
+    row.appendChild(title);
+
+    if(t.dueDate){
+      var isOverdue = !t.done && t.dueDate < todayStr();
+      var isToday = t.dueDate === todayStr();
+      var chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip" + (isOverdue ? " overdue" : isToday ? " today" : "");
+      chip.textContent = fmtChip(t.dueDate);
+      chip.title = "Change date";
+      chip.addEventListener("click", function(){
+        var input = document.createElement("input");
+        input.type = "date"; input.className = "chip-edit"; input.value = t.dueDate;
+        row.replaceChild(input, chip);
+        input.focus();
+        function commit(){
+          store.update(t.id, {dueDate: input.value || null});
+        }
+        input.addEventListener("change", commit);
+        input.addEventListener("blur", function(){ if(row.contains(input)) renderTasksView(); });
+      });
+      row.appendChild(chip);
+    } else {
+      var addDate = document.createElement("button");
+      addDate.type = "button";
+      addDate.className = "chip";
+      addDate.textContent = "+ date";
+      addDate.addEventListener("click", function(){
+        var input = document.createElement("input");
+        input.type = "date"; input.className = "chip-edit";
+        row.replaceChild(input, addDate);
+        input.focus();
+        input.addEventListener("change", function(){ store.update(t.id, {dueDate: input.value || null}); });
+        input.addEventListener("blur", function(){ if(row.contains(input)) renderTasksView(); });
+      });
+      row.appendChild(addDate);
+    }
+
+    var del = document.createElement("button");
+    del.className = "row-del"; del.setAttribute("aria-label","Delete task");
+    del.textContent = "×";
+    del.addEventListener("click", function(){ store.remove(t.id); });
+    row.appendChild(del);
+
+    return row;
+  }
+
+  function group(title, list, cls){
+    if(!list.length) return null;
+    var wrap = document.createElement("div");
+    wrap.className = "group";
+    var h = document.createElement("div");
+    h.className = "group-title" + (cls ? " " + cls : "");
+    h.innerHTML = '<span>' + title + '</span><span class="count">' + list.length + '</span>';
+    wrap.appendChild(h);
+    var rows = document.createElement("div");
+    rows.className = "rows";
+    list.forEach(function(t){ rows.appendChild(rowEl(t)); });
+    wrap.appendChild(rows);
+    return wrap;
+  }
+
+  function renderTasksView(){
+    taskGroupsEl.innerHTML = "";
+    if(!storeReady) return;
+
+    var all = Array.from(tasks.values());
+
+    if(!all.length){
+      var empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "No tasks yet — add your first one above.";
+      taskGroupsEl.appendChild(empty);
+      return;
+    }
+
+    var done = all.filter(function(t){ return t.done; })
+      .sort(function(a,b){ return b.createdAt - a.createdAt; });
+    var pending = all.filter(function(t){ return !t.done; });
+
+    if(sortMode === "deadline"){
+      var t0 = todayStr();
+      var overdue = [], today = [], upcoming = [], noDate = [];
+      pending.forEach(function(t){
+        if(!t.dueDate){ noDate.push(t); return; }
+        if(t.dueDate < t0) overdue.push(t);
+        else if(t.dueDate === t0) today.push(t);
+        else upcoming.push(t);
+      });
+      overdue.sort(function(a,b){ return a.dueDate < b.dueDate ? -1 : 1; });
+      upcoming.sort(function(a,b){ return a.dueDate < b.dueDate ? -1 : 1; });
+      noDate.sort(function(a,b){ return b.createdAt - a.createdAt; });
+
+      [
+        group("Overdue", overdue, "overdue"),
+        group("Today", today),
+        group("Upcoming", upcoming),
+        group("No date", noDate)
+      ].forEach(function(g){ if(g) taskGroupsEl.appendChild(g); });
+    } else {
+      var flat = pending.slice().sort(function(a,b){ return b.createdAt - a.createdAt; });
+      var g = group("All tasks", flat);
+      if(g) taskGroupsEl.appendChild(g);
+    }
+
+    if(!pending.length && done.length){
+      var msg = document.createElement("div");
+      msg.className = "empty";
+      msg.textContent = "Nothing pending — nice work.";
+      taskGroupsEl.appendChild(msg);
+    }
+
+    if(done.length){
+      var toggle = document.createElement("button");
+      toggle.className = "completed-toggle" + (completedOpen ? " open" : "");
+      toggle.innerHTML = '<span class="arrow">›</span><span>Completed (' + done.length + ')</span>';
+      toggle.addEventListener("click", function(){ completedOpen = !completedOpen; renderTasksView(); });
+      taskGroupsEl.appendChild(toggle);
+      if(completedOpen){
+        var rows = document.createElement("div");
+        rows.className = "rows";
+        done.forEach(function(t){ rows.appendChild(rowEl(t)); });
+        var doneWrap = document.createElement("div");
+        doneWrap.className = "group";
+        doneWrap.appendChild(rows);
+        taskGroupsEl.appendChild(doneWrap);
+      }
+    }
+  }
+
+  document.getElementById("addForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var titleEl = document.getElementById("newTitle");
+    var dateEl = document.getElementById("newDate");
+    var title = titleEl.value.trim();
+    if(!title) return;
+    store.add({ title: title, done:false, dueDate: dateEl.value || null, createdAt: Date.now() });
+    titleEl.value = ""; dateEl.value = "";
+    titleEl.focus();
+  });
+
+  // ---------- Calendar view ----------
+  var calDate = new Date(); calDate.setDate(1);
+  var selectedDay = null;
+  var calLabelEl = document.getElementById("calLabel");
+  var calGridEl = document.getElementById("calGrid");
+  var dayPanel = document.getElementById("dayPanel");
+  var dayPanelLabel = document.getElementById("dayPanelLabel");
+  var dayRows = document.getElementById("dayRows");
+
+  function tasksByDate(){
+    var map = {};
+    tasks.forEach(function(t){
+      if(!t.dueDate) return;
+      (map[t.dueDate] = map[t.dueDate] || []).push(t);
+    });
+    return map;
+  }
+
+  function renderCalendar(){
+    if(!storeReady) return;
+    var y = calDate.getFullYear(), m = calDate.getMonth();
+    calLabelEl.textContent = calDate.toLocaleDateString(undefined, {month:"long", year:"numeric"});
+    calGridEl.innerHTML = "";
+
+    var firstDow = new Date(y, m, 1).getDay();
+    var daysInMonth = new Date(y, m+1, 0).getDate();
+    var daysInPrev = new Date(y, m, 0).getDate();
+    var byDate = tasksByDate();
+    var t0 = todayStr();
+
+    var cells = [];
+    for(var i=firstDow-1; i>=0; i--){
+      cells.push({ y:y, m:m-1, d: daysInPrev-i, out:true });
+    }
+    for(var d=1; d<=daysInMonth; d++){
+      cells.push({ y:y, m:m, d:d, out:false });
+    }
+    var trailing = (7 - (cells.length % 7)) % 7;
+    for(var d2=1; d2<=trailing; d2++){
+      cells.push({ y:y, m:m+1, d:d2, out:true });
+    }
+
+    cells.forEach(function(c){
+      var realDate = new Date(c.y, c.m, c.d);
+      var ds = toDateStr(realDate);
+      var cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "day" + (c.out ? " out" : "") + (ds === t0 ? " today" : "") + (ds === selectedDay ? " selected" : "");
+      var num = document.createElement("div");
+      num.className = "num";
+      num.textContent = realDate.getDate();
+      cell.appendChild(num);
+
+      var dayTasks = byDate[ds];
+      if(dayTasks && dayTasks.length){
+        var dots = document.createElement("div");
+        dots.className = "dots";
+        dayTasks.slice(0,4).forEach(function(t){
+          var dot = document.createElement("span");
+          var isOverdue = !t.done && ds < t0;
+          dot.className = "dot" + (t.done ? " done" : isOverdue ? " overdue" : "") + (t.project ? " project" : "");
+          dot.title = t.project ? (t.project + ": " + t.title) : t.title;
+          dots.appendChild(dot);
+        });
+        cell.appendChild(dots);
+      }
+
+      cell.addEventListener("click", function(){
+        selectedDay = ds;
+        renderCalendar();
+        renderDayPanel();
+      });
+      calGridEl.appendChild(cell);
+    });
+
+    renderDayPanel();
+  }
+
+  function renderDayPanel(){
+    if(!selectedDay){ dayPanel.hidden = true; return; }
+    dayPanel.hidden = false;
+    var d = parseLocalDate(selectedDay);
+    dayPanelLabel.textContent = d.toLocaleDateString(undefined, {weekday:"long", month:"long", day:"numeric"});
+    var list = Array.from(tasks.values()).filter(function(t){ return t.dueDate === selectedDay; });
+    list.sort(function(a,b){ return (a.done - b.done) || (b.createdAt - a.createdAt); });
+    dayRows.innerHTML = "";
+    if(!list.length){
+      var empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "Nothing due this day yet.";
+      dayRows.appendChild(empty);
+      return;
+    }
+    list.forEach(function(t){ dayRows.appendChild(rowEl(t)); });
+  }
+
+  document.getElementById("dayAddForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var titleEl = document.getElementById("dayNewTitle");
+    var projectEl = document.getElementById("dayNewProject");
+    var title = titleEl.value.trim();
+    var project = projectEl.value.trim();
+    if(!title || !selectedDay) return;
+    store.add({ title: title, done:false, dueDate: selectedDay, project: project || null, createdAt: Date.now() });
+    titleEl.value = ""; projectEl.value = "";
+    titleEl.focus();
+  });
+
+  document.getElementById("calPrev").addEventListener("click", function(){
+    calDate.setMonth(calDate.getMonth()-1); renderCalendar();
+  });
+  document.getElementById("calNext").addEventListener("click", function(){
+    calDate.setMonth(calDate.getMonth()+1); renderCalendar();
+  });
+  document.getElementById("calToday").addEventListener("click", function(){
+    calDate = new Date(); calDate.setDate(1);
+    selectedDay = todayStr();
+    renderCalendar();
+  });
+
+  // ---------- Tabs ----------
+  var tabTasks = document.getElementById("tabTasks");
+  var tabCal = document.getElementById("tabCal");
+  var tasksView = document.getElementById("tasksView");
+  var calendarView = document.getElementById("calendarView");
+
+  function showTab(name){
+    var isTasks = name === "tasks";
+    tasksView.hidden = !isTasks;
+    calendarView.hidden = isTasks;
+    tabTasks.setAttribute("aria-selected", String(isTasks));
+    tabCal.setAttribute("aria-selected", String(!isTasks));
+    if(!isTasks) renderCalendar();
+  }
+  tabTasks.addEventListener("click", function(){ showTab("tasks"); });
+  tabCal.addEventListener("click", function(){ showTab("calendar"); });
+
+  initStore();
+})();
+</script>
+
+</body>
+</html>
